@@ -1,5 +1,6 @@
 import io
 import cProfile
+import traceback
 import tracemalloc
 import gymnasium as gym
 from gymnasium.spaces import Text
@@ -149,10 +150,32 @@ class SimpleEvaluator(gym.Env):
                 - infos (dict): Always an empty dictionary, as the environment does not have extra output.
         """
         assert self.entry_point in action
-        exec(action)
+        try:
+            exec(action)
+        except:
+            observation = traceback.format_exc()
+            reward = self.exception_reward
+            return (
+                observation,
+                reward,
+                False,
+                False,
+                {}
+            )
         # Start tracing memory allocations
         tracemalloc.start()
-        tmp = eval(f"{self.entry_point}()")
+        try:
+            tmp = eval(f"{self.entry_point}()")
+        except:
+            observation = traceback.format_exc()
+            reward = self.exception_reward
+            return (
+                observation,
+                reward,
+                False,
+                False,
+                {}
+            )
         # Take a snapshot
         snapshot = tracemalloc.take_snapshot()
         current, peak = tracemalloc.get_traced_memory()
@@ -168,7 +191,18 @@ class SimpleEvaluator(gym.Env):
             memory_usage += '\n'.join(stat.traceback.format()) + '\n'
         pr = cProfile.Profile()
         pr.enable()
-        tmp = eval(f"{self.entry_point}()")
+        try:
+            tmp = eval(f"{self.entry_point}()")
+        except:
+            observation = traceback.format_exc()
+            reward = self.exception_reward
+            return (
+                observation,
+                reward,
+                False,
+                False,
+                {}
+            )
         pr.disable()
         s = io.StringIO()
         ps = pstats.Stats(pr, stream=s).sort_stats('tottime')
