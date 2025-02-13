@@ -112,7 +112,7 @@ class SimpleEvaluator(gym.Env):
         self.action_space = Text(config["max_input_len"])
         self.entry_point = config["entry_point"]
         self.max_time_cost = config["max_time_cost"]
-        self.max_memory_cost = config["max_memory_cost"]
+        self.max_memory_cost = int(config["max_memory_cost"])
         self.time_weight = 1
         self.memory_weight = 1
         if "time_weight" in config and "memory_weight" in config:
