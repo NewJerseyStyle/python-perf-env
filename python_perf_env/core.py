@@ -192,7 +192,7 @@ class SimpleEvaluator(gym.Env):
                 {}
             )
         # Analyze the snapshot to see memory usage
-        memory_usage = f"Peak memory usage: {memory_reward}"
+        memory_usage = f"Peak memory usage: {memory_reward} bytes ({memory_reward/1024/1024} MiB)"
         time_reward = float(
             time_usage.split('function calls in ')[1].split(' ')[0])
         observation = (
