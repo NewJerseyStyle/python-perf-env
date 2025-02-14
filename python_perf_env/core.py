@@ -251,5 +251,5 @@ class SecureEvaluator(gym.Env):
     The Python code will be executed in a container environment instead of host machine 
     which makes it more secure as no file system operation will affect the host machine.
     """
-    __init__(self, *args, **kwargs):
+    __init__(self, config=DEFAULT_CONFIG):
         raise NotImplemented
