@@ -9,7 +9,7 @@ with open('LICENSE') as f:
 
 setup(
     name='python-perf-env',
-    version="v0.0.2",
+    version="v0.1.0",
     description='A Python package providing an environment for AI agents to test their code and receive detailed profiling feedback on execution time and memory usage. Facilitates performance analysis and optimization during AI development.',
     long_description=readme,
     long_description_content_type="text/markdown",

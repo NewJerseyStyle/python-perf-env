@@ -223,6 +223,45 @@ class SimpleEvaluator(gym.Env):
         )
 
 
+class TestDrivenEvaluator(SimpleEvaluator):
+    def __init__(self, config=DEFAULT_CONFIG):
+        super().__init__(config)
+        self.unittest_code = config.get("unittest")
+        assert self.unittest_code, "unittest_code must be included in config"
+        assert len(self.unittest_code) > 20, "unittest_code must be a non-empty string"
+        self.test_execenv = {}
+
+    def reset(self, *, seed=None, options=None):
+        obs_tuple = super().reset(seed=seed, options=options)
+        self.test_execenv = {}
+        return obs_tuple
+
+    def step(self, action):
+        observation, reward, terminated, truncated, infos = super().step(action)
+        try:
+            exec(action, self.test_execenv)
+            # Capture stdout for unittest results
+            output = io.StringIO()
+            sys.stdout = output
+            # Execute the unit tests
+            exec(self.unittest_code, self.test_execenv)
+            exec("unittest.main(exit=False)", self.test_execenv)
+            sys.stdout = sys.__stdout__
+            unittest_output = output.getvalue()
+        except Exception as e:
+            unittest_output = f"Unit test execution failed:\n{traceback.format_exc()}"
+        obs = observation.split("# Space complexity")
+        obs[0] = f"# Unit Test Output\n{unittest_output}\n\n---\n\n"
+        observation = "# Space complexity".join(obs)
+        return (
+            observation,
+            reward,
+            terminated,
+            truncated,
+            infos,
+        )
+
+
 class SecureEvaluator(gym.Env):
     """
     A Gymnasium environment for evaluating the performance (time and memory) of Python code.
