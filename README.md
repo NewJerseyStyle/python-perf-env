@@ -83,6 +83,56 @@ print(observation)
 print("Reward:", reward)
 ```
 
+## Using Test-Driven Development (TDD) with `TestDrivenEvaluator`
+
+The `TestDrivenEvaluator` allows you to integrate unit tests directly into the evaluation process.  This is particularly useful for guiding the AI agent towards solutions that satisfy specific test cases.
+
+> :warning: Known issue: The class name for the unittest must be `TestEnvMain(unittest.TestCase)` otherwise test case will not run.
+
+```python
+# Define unit tests
+unittest_code = """
+import unittest
+
+class TestEnvMain(unittest.TestCase):
+    def test_execution_time(self):
+        self.assertLess(my_function(), 0.1)  # Adjust the threshold as needed
+"""
+
+# Configure the environment for TDD
+tdd_config = {
+    "max_input_len": 2048,
+    "max_time_cost": 1,
+    "max_memory_cost": 1 * GB,
+    "exception_reward": -9,
+    "unittest": unittest_code,
+    "entry_point": "my_function"
+}
+env_tdd = TestDrivenEvaluator(config=tdd_config)
+
+# Reset the environment
+env_tdd.reset()
+
+# Define the code (same as before, or modified to pass the tests)
+code = """
+import time
+
+def my_function():
+    start_time = time.time()
+    for _ in range(100000): # Reduced iterations for faster testing
+        pass
+    end_time = time.time()
+    return end_time - start_time
+"""
+
+# Take a step in the environment
+observation, reward, terminated, truncated, info = env_tdd.step(code)
+
+print("Observation (TDD):")
+print(observation)
+print("Reward (TDD):", reward)
+```
+
 ## Further Information
 
 *   **Documentation:**  Refer to the docstrings within the code for detailed information about the `SimpleEvaluator` class, its attributes, and its methods.

@@ -1,11 +1,26 @@
 import io
 import sys
+import warnings
+from contextlib import redirect_stdout, redirect_stderr, contextmanager
 import pstats
 import cProfile
 import traceback
 import tracemalloc
 import gymnasium as gym
 from gymnasium.spaces import Text
+
+@contextmanager
+def capture_output():
+    new_out, new_err = io.StringIO(), io.StringIO()
+    old_out, old_err = sys.stdout, sys.stderr
+    try:
+        sys.stdout, sys.stderr = new_out, new_err
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            yield new_out, new_err, w
+    finally:
+        sys.stdout, sys.stderr = old_out, old_err
+
 
 GB = 1024 * 1024 * 1024
 DEFAULT_CONFIG = {
@@ -224,11 +239,45 @@ class SimpleEvaluator(gym.Env):
 
 
 class TestDrivenEvaluator(SimpleEvaluator):
+    """
+    A Gymnasium environment that extends SimpleEvaluator to incorporate test-driven development (TDD).
+
+    This environment allows an AI agent to submit Python code and a set of unit tests. The environment
+    executes the submitted code, runs the unit tests against it, and provides feedback on both
+    the code's performance (time and memory) and its correctness (based on the unit test results).
+    The unittest code must contain a class named `TestEnvMain` that inherits from `unittest.TestCase`.
+
+    The agent receives a reward signal based on the code's performance, as in SimpleEvaluator,
+    but the observation also includes the output of the unit tests, allowing the agent to learn
+    to write code that not only performs well but also passes the specified tests.
+
+    Example Usage:
+    ```python
+    unittest_code = '''import unittest
+
+class TestEnvMain(unittest.TestCase):
+    def test_return_value(self):
+        self.assertEqual(env_main(), 0)'''
+    env = TestDrivenEvaluator(config={
+        "max_input_len": 2048,
+        "max_time_cost": 1,
+        "max_memory_cost": 1 * GB,
+        "exception_reward": -9,
+        "unittest": unittest_code
+    })
+
+    code = '''def env_main():
+    return 0'''
+    obs, reward, _, _, _ = env.step(code)
+    print(obs)
+    ```
+    """
     def __init__(self, config=DEFAULT_CONFIG):
         super().__init__(config)
         self.unittest_code = config.get("unittest")
         assert self.unittest_code, "unittest_code must be included in config"
         assert len(self.unittest_code) > 20, "unittest_code must be a non-empty string"
+        assert "TestEnvMain(unittest.TestCase)" in self.unittest_code, "unittest_code must contain class named TestEnvMain inheriting unittest.TestCase"
         self.test_execenv = {}
 
     def reset(self, *, seed=None, options=None):
@@ -240,18 +289,18 @@ class TestDrivenEvaluator(SimpleEvaluator):
         observation, reward, terminated, truncated, infos = super().step(action)
         try:
             exec(action, self.test_execenv)
-            # Capture stdout for unittest results
-            output = io.StringIO()
-            sys.stdout = output
             # Execute the unit tests
             exec(self.unittest_code, self.test_execenv)
-            exec("unittest.main(exit=False)", self.test_execenv)
-            sys.stdout = sys.__stdout__
-            unittest_output = output.getvalue()
+            with capture_output() as (out, err, warns):
+                unittest_output = eval("unittest.TextTestRunner().run(unittest.TestLoader().loadTestsFromTestCase(TestEnvMain))", self.test_execenv)
+            unittest_output = f"# Unit Test\n{unittest_output}\n\n"
+            unittest_output += f"## stdout:\n{out.getvalue()}\n\n"
+            unittest_output += f"## stderr:\n{err.getvalue()}\n\n"
+            unittest_output += f"## warnings:\n{[str(w.message) for w in warns]}\n\n"
         except Exception as e:
             unittest_output = f"Unit test execution failed:\n{traceback.format_exc()}"
         obs = observation.split("# Space complexity")
-        obs[0] = f"# Unit Test Output\n{unittest_output}\n\n---\n\n"
+        obs[0] = f"{unittest_output}\n\n---\n\n"
         observation = "# Space complexity".join(obs)
         return (
             observation,

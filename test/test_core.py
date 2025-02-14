@@ -1,6 +1,6 @@
 import unittest
 
-from python_perf_env import SimpleEvaluator
+from python_perf_env import SimpleEvaluator, TestDrivenEvaluator
 
 GB = 1024 * 1024 * 1024
 
@@ -84,6 +84,51 @@ def env_main():
         self.assertLess(reward, -4)
         self.assertGreater(reward, -5)
 
+
+class TestTDD(unittest.TestCase):
+    def test_pass(self):
+        unittest_code = """import unittest
+
+class TestEnvMain(unittest.TestCase):
+    def test_return_value(self):
+        self.assertEqual(env_main(), 0)"""
+        env = TestDrivenEvaluator(config={
+            "max_input_len": 2048,
+            "max_time_cost": 1,
+            "max_memory_cost": 1 * GB,
+            "exception_reward": -9,
+            "unittest": unittest_code
+        })
+        
+        code = """def env_main():
+    return 0"""
+        obs, reward, _, _, _ = env.step(code)
+        test_sum = obs.split('\n')[1]
+        self.assertTrue("<unittest.runner.TextTestResult run=1" in test_sum)
+        self.assertTrue("errors=0" in test_sum)
+        self.assertTrue("failures=0" in test_sum)
+
+    def test_fail(self):
+        unittest_code = """import unittest
+
+class TestEnvMain(unittest.TestCase):
+    def test_return_value(self):
+        self.assertEqual(env_main(), 1)
+"""
+        env = TestDrivenEvaluator(config={
+            "max_input_len": 2048,
+            "max_time_cost": 1,
+            "max_memory_cost": 1 * GB,
+            "exception_reward": -9,
+            "unittest": unittest_code
+        })
+        
+        code = """def env_main():
+    return 0"""
+        obs, reward, _, _, _ = env.step(code)
+        test_sum = obs.split('\n')[1]
+        self.assertTrue("<unittest.runner.TextTestResult run=1" in test_sum)
+        self.assertTrue("failures=1" in test_sum)
 
 if __name__ == '__main__':
     unittest.main()
