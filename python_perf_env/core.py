@@ -1,4 +1,5 @@
 import io
+import pstats
 import cProfile
 import traceback
 import tracemalloc
@@ -87,6 +88,7 @@ class SimpleEvaluator(gym.Env):
         "max_time_cost": 1,  # The maximum allowed execution time (in seconds)
         "max_memory_cost": 1 * GB,  # The maximum allowed memory usage (in bytes)
         "entry_point": "my_function",
+        "exception_reward": -9
     }
 
     env_custom = SimpleEvaluator(config=custom_config)
@@ -115,7 +117,9 @@ class SimpleEvaluator(gym.Env):
                                      Defaults to DEFAULT_CONFIG.
         """
         self.action_space = Text(config["max_input_len"])
-        self.entry_point = config["entry_point"]
+        self.entry_point = config.get("entry_point")
+        if self.entry_point is None:
+            self.entry_point = DEFAULT_CONFIG["entry_point"]
         self.max_time_cost = config["max_time_cost"]
         self.max_memory_cost = int(config["max_memory_cost"])
         self.time_weight = 1
@@ -132,7 +136,7 @@ class SimpleEvaluator(gym.Env):
         assert self.max_memory_cost > 0
         assert self.max_time_cost > 0
         assert len(self.entry_point) > 0
-        assert len(config["max_input_len"]) > 8 + len(self.entry_point)
+        assert config["max_input_len"] > 8 + len(self.entry_point)
         self.observation_space = Text(2048)
         self.reward = 0
 
@@ -165,7 +169,18 @@ class SimpleEvaluator(gym.Env):
         """
         assert self.entry_point in action
         try:
-            exec(action)
+            exec(action, locals())
+            # Start tracing memory allocations
+            tracemalloc.start()
+            executed_result = eval(f"{self.entry_point}()")
+            _, memory_reward = tracemalloc.get_traced_memory()
+            # Stop tracing memory allocations
+            tracemalloc.stop()
+            # Start tracing time costs
+            cProfile.runctx(f"{self.entry_point}()", None, locals(), "eval_stats")
+            s = io.StringIO()
+            ps = pstats.Stats("eval_stats", stream=s).sort_stats('tottime').print_stats()
+            time_usage = s.getvalue()
         except:
             observation = traceback.format_exc()
             reward = self.exception_reward
@@ -176,58 +191,16 @@ class SimpleEvaluator(gym.Env):
                 False,
                 {}
             )
-        # Start tracing memory allocations
-        tracemalloc.start()
-        try:
-            tmp = eval(f"{self.entry_point}()")
-        except:
-            observation = traceback.format_exc()
-            reward = self.exception_reward
-            return (
-                observation,
-                reward,
-                False,
-                False,
-                {}
-            )
-        # Take a snapshot
-        snapshot = tracemalloc.take_snapshot()
-        current, peak = tracemalloc.get_traced_memory()
-        tracemalloc.get_traced_memory()
-        # Stop tracing memory allocations
-        tracemalloc.stop()
-        # memory_reward = peak - current
-        memory_reward = peak
         # Analyze the snapshot to see memory usage
-        top_stats = snapshot.statistics('lineno')
-        memory_usage = "[ Detailed traceback for the top memory consumer ]\n"
-        for stat in top_stats[:1]:
-            memory_usage += '\n'.join(stat.traceback.format()) + '\n'
-        pr = cProfile.Profile()
-        pr.enable()
-        try:
-            tmp = eval(f"{self.entry_point}()")
-        except:
-            observation = traceback.format_exc()
-            reward = self.exception_reward
-            return (
-                observation,
-                reward,
-                False,
-                False,
-                {}
-            )
-        pr.disable()
-        s = io.StringIO()
-        ps = pstats.Stats(pr, stream=s).sort_stats('tottime')
-        time_usage = s.getvalue()
+        memory_usage = f"Peak memory usage: {memory_reward}"
         time_reward = float(
             time_usage.split('function calls in ')[1].split(' ')[0])
         observation = (
-            f"# Space complexity\n\n{memory_usage}\n\n---\n"
+            f"# Output\n{executed_result}\n\n---\n\n"
+            f"# Space complexity\n\n{memory_usage}\n\n---\n\n"
             f"# Time complexity\n\n{time_usage}")
         normalized_time_cost = min(time_reward / self.max_time_cost, 1)
-        normalized_memory_cost = min(time_reward / self.max_memory_cost, 1)
+        normalized_memory_cost = min(memory_reward / self.max_memory_cost, 1)
         total_cost = (
             self.time_weight * normalized_time_cost
         ) + (
