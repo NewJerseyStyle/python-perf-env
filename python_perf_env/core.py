@@ -1,4 +1,5 @@
 import io
+import sys
 import pstats
 import cProfile
 import traceback
@@ -21,7 +22,7 @@ class SimpleEvaluator(gym.Env):
 
     This environment allows an AI agent to submit Python code (as a string) and receive
     feedback on its execution time and memory usage. It uses `cProfile` for time profiling
-    and `tracemalloc` for memory profiling.  The environment provides a reward signal
+    and `tracemalloc` for memory profiling. The environment provides a reward signal
     based on the time and memory costs, encouraging the agent to optimize its code.
 
     Attributes:
@@ -131,12 +132,12 @@ class SimpleEvaluator(gym.Env):
             config["exception_reward"] *
             max(self.time_weight, self.memory_weight)
         )
-        assert self.exception_reward < 0
-        assert min(self.time_weight, self.memory_weight) > 0
-        assert self.max_memory_cost > 0
-        assert self.max_time_cost > 0
-        assert len(self.entry_point) > 0
-        assert config["max_input_len"] > 8 + len(self.entry_point)
+        assert self.exception_reward < 0, "Exception reward must be negative"
+        assert min(self.time_weight, self.memory_weight) > 0, "Time and memory weights must be positive"
+        assert self.max_memory_cost > 0, "Max memory cost must be positive"
+        assert self.max_time_cost > 0, "Max time cost must be positive"
+        assert len(self.entry_point) > 0, "Entry point must be a non-empty string"
+        assert config["max_input_len"] > 8 + len(self.entry_point), "Max input length must be greater than the length of the name of function"
         self.observation_space = Text(2048)
         self.reward = 0
 
@@ -167,7 +168,7 @@ class SimpleEvaluator(gym.Env):
                 - truncated (bool): Always False, as the environment does not have a truncation condition.
                 - infos (dict): Always an empty dictionary, as the environment does not have extra output.
         """
-        assert self.entry_point in action
+        assert self.entry_point in action, f"Entry point '{self.entry_point}' not found in the provided code."
         try:
             exec(action, locals())
             # Start tracing memory allocations
@@ -181,7 +182,7 @@ class SimpleEvaluator(gym.Env):
             s = io.StringIO()
             ps = pstats.Stats("eval_stats", stream=s).sort_stats('tottime').print_stats()
             time_usage = s.getvalue()
-        except:
+        except Exception as e:
             observation = traceback.format_exc()
             reward = self.exception_reward
             return (
@@ -193,8 +194,11 @@ class SimpleEvaluator(gym.Env):
             )
         # Analyze the snapshot to see memory usage
         memory_usage = f"Peak memory usage: {memory_reward} bytes ({memory_reward/1024/1024} MiB)"
-        time_reward = float(
-            time_usage.split('function calls in ')[1].split(' ')[0])
+        try:
+            time_reward = float(
+                time_usage.split('function calls in ')[1].split(' ')[0])
+        except Exception as e:
+            time_reward = self.max_time_cost # Assign max cost if parsing fails
         observation = (
             f"# Output\n{executed_result}\n\n---\n\n"
             f"# Space complexity\n\n{memory_usage}\n\n---\n\n"
