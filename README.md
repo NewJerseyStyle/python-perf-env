@@ -39,7 +39,7 @@ custom_config = {
     "max_time_cost": 1,  # The maximum allowed execution time (in seconds)
     "max_memory_cost": 1 * GB,  # The maximum allowed memory usage (in bytes)
     "time_weight": 2, # Weight for time cost in reward calculation (default: 1).
-    "memory_weight": 0.5 # Weight for memory cost in reward calculation (default: 1).
+    "memory_weight": 0.5, # Weight for memory cost in reward calculation (default: 1).
     "entry_point": "my_function",
 }
 env_custom = SimpleEvaluator(config=custom_config)
@@ -55,13 +55,13 @@ env.reset()
 
 ### 4. Define the code to be executed:
 
-The code you submit to the environment *must* include a function with the name specified in the `entry_point` configuration (defaults to `"env_main"`).
+The code you submit to the environment *must* include a function with the name specified in the `entry_point` configuration where we setted `"my_function"` in the `custom_config` (defaults to `"env_main"`).
 
 ```python
 code = """
 import time
 
-def env_main():
+def my_function():
     start_time = time.time()
     for _ in range(1000000):
         pass  # Simulate some work

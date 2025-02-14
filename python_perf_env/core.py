@@ -10,7 +10,8 @@ DEFAULT_CONFIG = {
     "max_input_len": 32000,    # longest length of the code
     "max_time_cost": 60,       # longest time of execution
     "max_memory_cost": 4 * GB, # largest available memory
-    "entry_point": "env_main"
+    "entry_point": "env_main",
+    "exception_reward": -9
 }
 
 class SimpleEvaluator(gym.Env):
@@ -42,6 +43,8 @@ class SimpleEvaluator(gym.Env):
         entry_point (str): The name of the function to execute (default: "env_main").
         time_weight (float): Weight for time cost in reward calculation (default: 1).
         memory_weight (float): Weight for memory cost in reward calculation (default: 1).
+        exception_reward (float): Negative number reward for exception in code (default: -9).
+                                  The number will multiply with `max(time_weight, memory_weight)`.
 
     Methods:
         reset(seed=None, options=None): Resets the environment to its initial state.
@@ -119,6 +122,16 @@ class SimpleEvaluator(gym.Env):
         if "time_weight" in config and "memory_weight" in config:
             self.time_weight = config["time_weight"]
             self.memory_weight = config["memory_weight"]
+        self.exception_reward = (
+            config["exception_reward"] *
+            max(self.time_weight, self.memory_weight)
+        )
+        assert self.exception_reward < 0
+        assert min(self.time_weight, self.memory_weight) > 0
+        assert self.max_memory_cost > 0
+        assert self.max_time_cost > 0
+        assert len(self.entry_point) > 0
+        assert len(config["max_input_len"]) > 8 + len(self.entry_point)
         self.observation_space = Text(2048)
         self.reward = 0
 
