@@ -7,6 +7,7 @@ GB = 1024 * 1024 * 1024
 class Testing(unittest.TestCase):
     def test_normal(self):
         env = SimpleEvaluator(config={
+            "max_input_len": 2048,
             "max_time_cost": 1,
             "max_memory_cost": 1 * GB,
         })
@@ -22,6 +23,7 @@ def env_main():
     def test_exception(self):
         time_weight = 2
         env = SimpleEvaluator(config={
+            "max_input_len": 2048,
             "max_time_cost": 1,
             "max_memory_cost": 1 * GB,
             "time_weight": time_weight,
@@ -40,6 +42,7 @@ def env_main():
 
     def test_timeout(self):
         env = SimpleEvaluator(config={
+            "max_input_len": 2048,
             "max_time_cost": 1,
             "max_memory_cost": 1 * GB,
             "time_weight": 2,
@@ -58,6 +61,7 @@ def env_main():
 
     def test_outofmemory(self):
         env = SimpleEvaluator(config={
+            "max_input_len": 2048,
             "max_time_cost": 1,
             "max_memory_cost": 10, # 10 bytes upperlimit
             "time_weight": 1,

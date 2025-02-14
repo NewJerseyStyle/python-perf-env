@@ -83,6 +83,7 @@ class SimpleEvaluator(gym.Env):
     # Example using a custom configuration:
     GB = 1024 * 1024 * 1024
     custom_config = {
+        "max_input_len": 2048,
         "max_time_cost": 1,  # The maximum allowed execution time (in seconds)
         "max_memory_cost": 1 * GB,  # The maximum allowed memory usage (in bytes)
         "entry_point": "my_function",

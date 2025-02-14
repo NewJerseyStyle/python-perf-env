@@ -36,6 +36,7 @@ Or, you can customize the environment by providing a configuration dictionary:
 ```python
 # Say we want focused on optimizing algorithm on time
 custom_config = {
+    "max_input_len": 2048,
     "max_time_cost": 1,  # The maximum allowed execution time (in seconds)
     "max_memory_cost": 1 * GB,  # The maximum allowed memory usage (in bytes)
     "time_weight": 2, # Weight for time cost in reward calculation (default: 1).
