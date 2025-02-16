@@ -13,7 +13,7 @@ Install the package using pip:
 pip install python-perf-env
 ```
 
-## Quick Start / Get Started
+## Quick Start
 
 This guide provides a quick introduction to using the `python_perf_env` package. It demonstrates how to create and interact with the `SimpleEvaluator` environment.
 
